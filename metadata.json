@@ -1,0 +1,6 @@
+{
+  "name": "Friday",
+  "description": "Friday - Ultra intelligent private AI companion built exclusively for her Creator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
