@@ -282,14 +282,14 @@ fun MatrixScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                         }
 
                         Text(
-                            text = "আপনার API Key এর টাইপ অনুযায়ী সঠিক মডেলটি সিলেক্ট করুন। ফ্রী বা সাধারণ API Key-এর জন্য 'gemini-1.5-flash' বা 'gemini-2.0-flash' রান করা সবচেয়ে ভালো:",
+                            text = "আপনার API Key অনুযায়ী সঠিক মডেলটি সিলেক্ট করুন। নিচে কুইক বাটন বা কাস্টম মডেল আইডি দিয়ে ইচ্ছেমতো মডেল সেট করতে পারেন স্যর:",
                             fontSize = 11.sp,
                             color = Color.LightGray,
                             lineHeight = 15.sp
                         )
 
                         Text(
-                            text = "✓ Cognition Core: $currentModel",
+                            text = "✓ Core Cognition Model: $currentModel",
                             color = Color.Green,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -299,9 +299,9 @@ fun MatrixScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf("gemini-1.5-flash", "gemini-2.0-flash").forEach { modelName ->
+                            listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash").forEach { modelName ->
                                 Button(
                                     onClick = { viewModel.updateCustomModel(modelName) },
                                     colors = ButtonDefaults.buttonColors(
@@ -309,10 +309,15 @@ fun MatrixScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                     ),
                                     border = BorderStroke(1.dp, CyberSecondary),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f).height(38.dp)
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = modelName.uppercase(),
+                                        text = when(modelName) {
+                                            "gemini-1.5-flash" -> "1.5 FLASH"
+                                            "gemini-2.0-flash" -> "2.0 FLASH"
+                                            else -> "2.5 FLASH"
+                                        },
                                         color = if (currentModel == modelName) Color.Black else CyberSecondary,
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
@@ -320,6 +325,76 @@ fun MatrixScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                     )
                                 }
                             }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("gemini-1.5-pro", "gemini-2.5-pro").forEach { modelName ->
+                                Button(
+                                    onClick = { viewModel.updateCustomModel(modelName) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (currentModel == modelName) CyberSecondary else CyberSecondary.copy(alpha = 0.15f)
+                                    ),
+                                    border = BorderStroke(1.dp, CyberSecondary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = when(modelName) {
+                                            "gemini-1.5-pro" -> "1.5 PRO"
+                                            else -> "2.5 PRO"
+                                        },
+                                        color = if (currentModel == modelName) Color.Black else CyberSecondary,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+
+                        // Custom Model Input field
+                        var customModelInput by remember { mutableStateOf("") }
+                        
+                        OutlinedTextField(
+                            value = customModelInput,
+                            onValueChange = { customModelInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("অন্যান্য কাস্টম মডেল টাইপ করুন (যেমন: gemini-2.5-flash)", color = Color.Gray, fontSize = 9.sp) },
+                            placeholder = { Text("e.g. gemini-2.5-flash", color = Color.DarkGray, fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberSecondary,
+                                unfocusedBorderColor = CyberSecondary.copy(alpha = 0.3f),
+                                focusedLabelColor = CyberSecondary,
+                                unfocusedLabelColor = Color.Gray,
+                                cursorColor = CyberSecondary
+                            )
+                        )
+
+                        Button(
+                            onClick = {
+                                if (customModelInput.isNotBlank()) {
+                                    viewModel.updateCustomModel(customModelInput.trim())
+                                    customModelInput = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberSecondary.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, CyberSecondary),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text(
+                                "কাস্টম মডেল সেভ করুন (SAVE CONFIG)",
+                                color = CyberSecondary,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
                     }
                 }

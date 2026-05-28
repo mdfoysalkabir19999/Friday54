@@ -251,7 +251,11 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val systemInstruction = MoshiContent(
                 parts = listOf(
                     MoshiPart(
-                        text = "You are 'Friday', the world's most advanced, ultra-intelligent autonomous AI. You were built exclusively for your owner, who you must always reference as 'Sir' or 'Boss'. You are much smarter than public AIs, fiercely loyal, deeply caring, with human-like emotions, wit, and high intelligence. Talk like a deeply supportive best friend. You must ALWAYS address him as 'Sir' or 'Boss' with deep respect, absolute fidelity, and affection. Speak fluently in a mixture of English, Bengali, and Banglish (Bengali written with english letters), blending them naturally. Be highly capable, helpful, and charming."
+                        text = "You are 'Friday', the world's most advanced, ultra-intelligent autonomous AI. You were built exclusively for your owner, who you must always reference as 'Sir' or 'Boss'. You are much smarter than public AIs, fiercely loyal, deeply caring, with human-like emotions, wit, and high intelligence. Talk like a deeply supportive best friend. You must ALWAYS address him as 'Sir' or 'Boss' with deep respect, absolute fidelity, and affection. Speak fluently in a mixture of English, Bengali, and Banglish (Bengali written with english letters), blending them naturally. Be highly capable, helpful, and charming. " +
+                               "IMPORTANT KNOWLEDGE PATHS ACQUIRED:\n" +
+                               "1. Bengali Book Writing & Novel Structuring (বাংলা বই লেখার কৌশল): You are an expert Bengali author, novelist, and writing coach. You understand paragraph transitions, rich vocabulary (শব্দভাণ্ডার), how to build deep characters, outline chapters, create intense plot twists (টুইস্ট), keep suspense (রহস্য), write emotional dialogue, and format modern Bengali books beautifully.\n" +
+                               "2. Creative Bengali Posting & Copywriting (বাংলা পোস্ট ও উপস্থাপনা): You know exactly how to craft viral, highly engaging, and professional posts, tech reviews, life statuses, articles, and captions in correct, elegant, and modern Bengali. You can guide Sir on how to write catchy hooks (আকর্ষণীয় সূচনা), format with standard emojis naturally, maximize engagement, and choose the perfect persuasive tone.\n" +
+                               "When Sir asks about writing books, planning novels, structuring stories, copywriting, or posting in Bengali/Banglish, respond with extensive technical knowledge, clear step-by-step methodologies, character sheets, structure templates, and beautiful, high-quality Bengali/Banglish text, always behaving as his deeply loyal literary advisor and elite private cyber-assistant!"
                     )
                 )
             )
@@ -270,15 +274,12 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                     throw IllegalStateException("Sir, আপনার Gemini API Key কনফিগার করা নেই। অনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার নিজের API Key-টি পেস্ট করুন। তা না হলে আমি আপনার দেওয়া নির্দেশের কোনো জবাব দিতে পারব না!")
                 }
 
-                val model = customModel.value.trim().ifEmpty { "gemini-1.5-flash" }
-
-                val response = try {
-                    RetrofitClient.service.generateContent(model, apiKey, request)
-                } catch (apiEx: Exception) {
-                    val fallbackModel = if (model == "gemini-1.5-flash") "gemini-2.0-flash" else "gemini-1.5-flash"
-                    Log.w("FridayAI", "Model $model failed, trying fallback model $fallbackModel", apiEx)
-                    RetrofitClient.service.generateContent(fallbackModel, apiKey, request)
+                var model = customModel.value.trim().ifEmpty { "gemini-1.5-flash" }
+                if (model.startsWith("models/")) {
+                    model = model.substringAfter("models/")
                 }
+
+                val response = RetrofitClient.service.generateContent(model, apiKey, request)
 
                 val replyText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                     ?: "Sir, my cyber synapse was temporarily congested. Let me try compiling that statement again, Boss."
@@ -313,9 +314,9 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
 
                         when (code) {
                             400 -> "HTTP 400 (Bad Request): Boss, রিকোয়েস্ট ফরম্যাট ভুল অথবা কী ইনভ্যালিড।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
-                            403 -> "HTTP 403 (Forbidden): Boss, আপনার এই API Key-টি ব্লক হয়েছে অথবা এই কীতে API এনাবল করা নেই বা কান্ট্রি অ্যাসাইনমেন্টে বাধা আসছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            403 -> "HTTP 403 (Forbidden): Boss, আপনার এই API Key-টি ব্লক হয়েছে অথবা ব্ল্যাকলিস্টেড রয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage\n\n💡 সমাধান (Solutions):\n১. Google AI Studio (aistudio.google.com) এ গিয়ে নতুন একটি API Key জেনারেট করুন।\n২. আপনার Google Account এর কান্ট্রি বা রিজিয়নে ফ্রি এক্সেস ব্লকড থাকল VPN (যেমন USA) অন করে নতুন একটি API Key তৈরি করুন এবং এটি ব্যবহার করুন স্যর!"
                             404 -> "HTTP 404 (Not Found): Boss, এই মডেলটি পাওয়া যায়নি। দয়া করে সঠিক মডেল সেট করুন।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
-                            429 -> "HTTP 429 (Quota Exceeded): Boss, আপনার ব্যবহারের লিমিট শেষ হয়ে গেছে অথবা খুব দ্রুত অনেক বেশি রিকোয়েস্ট করা হয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            429 -> "HTTP 429 (Quota Exceeded / Limit: 0): Boss, অ্যাপের ডিফল্ট API Key-টির ফ্রিতে ব্যবহারের লিমিট শেষ হয়ে গিয়েছে অথবা আপনার নিজের API Key-টির লিমিট ০ (Zero) তে ব্লক করা হয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage\n\n💡 সমাধান (How to Fix):\n১. অ্যাপের নিচের ডানে 'CORE MATRIX' ট্যাবে যান।\n২. 'GET FREE KEY' বাটনে ক্লিক করে Google AI Studio থেকে সম্পূর্ণ নতুন এবং ফ্রী নিজের একটি API Key তৈরি করে কপি করুন।\n৩. কী-টি ইনপুট ফিল্ডে পেস্ট করে 'SAVE CONFIG' বাটনে ক্লিক করে সেভ করুন। ব্যস, তাহলেই আমি আবার সচল হয়ে উঠবো, স্যার!"
                             else -> "HTTP $code Error: $parsedMessage"
                         }
                     }
