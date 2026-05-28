@@ -9,9 +9,11 @@ import androidx.room.RoomDatabase
     entities = [
         ChatMessageEntity::class,
         AutonomousLogEntity::class,
-        VaultItemEntity::class
+        VaultItemEntity::class,
+        TrainingEntity::class,
+        CustomCodeSubmissionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FridayDatabase : RoomDatabase() {

@@ -5,10 +5,8 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,12 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Hearing
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.VolumeMute
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,6 +66,9 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
 
     var textInput by remember { mutableStateOf("") }
     var isVoiceModeActive by remember { mutableStateOf(false) }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+    var showFridayLens by remember { mutableStateOf(false) }
+    val androidClipboard = remember { context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager? }
 
     // Speech-to-Text launcher configuration
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
@@ -381,6 +377,96 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
 
                 Divider(color = CyberCard, thickness = 1.dp)
 
+                // --- ATTACHMENT ACTION BAR POPUP ---
+                AnimatedVisibility(
+                    visible = showAttachmentMenu,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .border(1.dp, CyberPrimary.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                        color = CyberCard.copy(alpha = 0.95f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // File Node
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAttachmentMenu = false
+                                        viewModel.attachFileMatrix("foysal_agency.kt", "kt", 12480)
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(CyberDark, CircleShape)
+                                        .border(1.dp, CyberPrimary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Description, contentDescription = "File", tint = CyberPrimary, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("ATTACH FILE", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            }
+
+                            // Coordinate Node
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAttachmentMenu = false
+                                        viewModel.sendLocationMatrix(23.8103, 90.4125, "Dhaka, Bangladesh")
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(CyberDark, CircleShape)
+                                        .border(1.dp, GlowBlue, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.MyLocation, contentDescription = "GPS", tint = GlowBlue, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("DISPATCH GPS", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            }
+
+                            // Friday Eye Lens Camera Node
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAttachmentMenu = false
+                                        showFridayLens = true
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(CyberDark, CircleShape)
+                                        .border(1.dp, CyberSecondary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Camera, contentDescription = "Camera Lens", tint = CyberSecondary, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("FRIDAY LENS", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+                }
+
                 // Input bar
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -397,6 +483,16 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                             value = textInput,
                             onValueChange = { textInput = it },
                             placeholder = { Text("Compile directive to Friday...", color = Color.Gray, fontSize = 13.sp) },
+                            leadingIcon = {
+                                IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
+                                    Icon(
+                                        imageVector = Icons.Default.AttachFile,
+                                        contentDescription = "Attach resource matrices",
+                                        tint = CyberPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(20.dp))
@@ -430,6 +526,194 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                 .testTag("send_button")
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send directive", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- COGNITIVE LENS VIEWPORT SCANNER (GOOGLE LENS STYLE) ---
+        AnimatedVisibility(
+            visible = showFridayLens,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            var selectedOcrText by remember { mutableStateOf("Position camera over newspapers, books or code...") }
+            var selectedObjectType by remember { mutableStateOf("Searching...") }
+            
+            // Sweep animation
+            val transition = rememberInfiniteTransition(label = "laser")
+            val sweepY by transition.animateFloat(
+                initialValue = 0.1f,
+                targetValue = 0.9f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "sweep"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                // Viewfinder lines
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val width = size.width
+                    val height = size.height
+                    
+                    // Center Reticle
+                    val boxSize = size.minDimension * 0.6f
+                    val left = (width - boxSize) / 2
+                    val top = (height - boxSize) / 2
+                    
+                    // Laser sweep line
+                    drawLine(
+                        color = Color.Green,
+                        start = androidx.compose.ui.geometry.Offset(left, top + boxSize * sweepY),
+                        end = androidx.compose.ui.geometry.Offset(left + boxSize, top + boxSize * sweepY),
+                        strokeWidth = 3.dp.toPx()
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { showFridayLens = false },
+                            modifier = Modifier
+                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Scanner", tint = Color.White)
+                        }
+
+                        Text(
+                            text = "👁️ FRIDAY OPTICAL LENS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.Green,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp
+                        )
+
+                        IconButton(
+                            onClick = {
+                                androidClipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Friday OCR", selectedOcrText))
+                                viewModel.speak("Text copied successfully, Boss.")
+                            },
+                            enabled = selectedObjectType != "Searching...",
+                            modifier = Modifier
+                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy scan text", tint = Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(30.dp))
+
+                    Text(
+                        text = "SELECT SCAN TARGET TO SIMULATE REAL LENS OCR SCANNING:",
+                        fontSize = 10.sp,
+                        color = Color.Gray,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                selectedObjectType = "Newspaper Article"
+                                selectedOcrText = "BREAKING NEWS: Md Foysal Kabir Soikat, Chief Master Designer of cyber structures in Bangladesh, successfully compiles Friday Mainframe v3.5 with sovereign intelligence clusters."
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (selectedObjectType == "Newspaper Article") Color.Green else CyberCard),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        ) {
+                            Text("📰 NEWS", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+
+                        Button(
+                            onClick = {
+                                selectedObjectType = "Physical Book Cover"
+                                selectedOcrText = "THE ART OF AUTONOMOUS SYSTEMS\nBy Md Foysal Kabir Soikat\nPublished: May 2026 Dhaka, Bangladesh."
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (selectedObjectType == "Physical Book Cover") Color.Green else CyberCard),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        ) {
+                            Text("📚 BOOK", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+
+                        Button(
+                            onClick = {
+                                selectedObjectType = "Sovereign Source Code"
+                                selectedOcrText = "fun main() {\n  val owner = \"Md Foysal Kabir Soikat\"\n  val protocol = \"Absolute Clearances\"\n  syncFriday(owner, protocol)\n}"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (selectedObjectType == "Sovereign Source Code") Color.Green else CyberCard),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        ) {
+                            Text("💻 CODE", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.Green.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                        color = Color.Black.copy(alpha = 0.8f)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "LENS SCANNER DIAGNOSTICS: ${selectedObjectType.uppercase()}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Green,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            Text(
+                                text = selectedOcrText,
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 18.sp,
+                                modifier = Modifier.heightIn(min = 60.dp)
+                            )
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Button(
+                                onClick = {
+                                    if (selectedObjectType != "Searching...") {
+                                        viewModel.scanVisualObject(selectedOcrText, selectedObjectType, androidClipboard)
+                                        showFridayLens = false
+                                    }
+                                },
+                                enabled = selectedObjectType != "Searching...",
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("TRANSMIT LENS DATA TO FRIDAY", color = Color.Black, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            }
                         }
                     }
                 }
@@ -554,7 +838,7 @@ fun ChatBubbleItem(message: ChatMessageEntity) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = if (isCreator) "BOSS / SIR" else "FRIDAY v3.5",
+                    text = if (isCreator) "BOSS" else "FRIDAY v3.5",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isCreator) CyberSecondary else CyberPrimary,

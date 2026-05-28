@@ -119,3 +119,47 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+val appBuildDir: File = layout.buildDirectory.asFile.get()
+val workspaceRootDir: File = rootDir
+
+tasks.register("copyApkToWorkspace") {
+    val buildFolder = appBuildDir
+    val rootFolder = workspaceRootDir
+    doLast {
+        val apkFile = File(buildFolder, "outputs/apk/debug/app-debug.apk")
+        if (apkFile.exists()) {
+            val targets = listOf(
+                "Friday_Install.apk",
+                "Friday_Install_Rename_Me.zip",
+                "Friday_Install_Rename_Me.bin",
+                "Friday_Install_Rename_Me.png"
+            )
+            targets.forEach { fileName ->
+                val destFile = File(rootFolder, fileName)
+                apkFile.copyTo(destFile, overwrite = true)
+                println("APK copied successfully as $fileName: ${destFile.absolutePath}")
+            }
+        } else {
+            val platformApk = File(rootFolder, ".build-outputs/app-debug.apk")
+            if (platformApk.exists()) {
+                val targets = listOf(
+                    "Friday_Install.apk",
+                    "Friday_Install_Rename_Me.zip",
+                    "Friday_Install_Rename_Me.bin",
+                    "Friday_Install_Rename_Me.png"
+                )
+                targets.forEach { fileName ->
+                    val destFile = File(rootFolder, fileName)
+                    platformApk.copyTo(destFile, overwrite = true)
+                    println("Fallback platform APK copied as $fileName: ${destFile.absolutePath}")
+                }
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.findByName("assembleDebug")?.finalizedBy("copyApkToWorkspace")
+}
+

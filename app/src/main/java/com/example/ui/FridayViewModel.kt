@@ -1,15 +1,13 @@
 package com.example.ui
 
 import android.app.Application
+import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
-import com.example.data.database.AutonomousLogEntity
-import com.example.data.database.ChatMessageEntity
-import com.example.data.database.FridayDatabase
-import com.example.data.database.VaultItemEntity
+import com.example.data.database.*
 import com.example.data.repository.FridayRepository
 import com.example.network.GenerateContentRequest
 import com.example.network.MoshiContent
@@ -30,6 +28,16 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
 
     private val database = FridayDatabase.getDatabase(application)
     private val repository = FridayRepository(database.fridayDao())
+    private val prefs = application.getSharedPreferences("friday_prefs", Context.MODE_PRIVATE)
+
+    // --- Key Manager ---
+    private val _customApiKey = MutableStateFlow(prefs.getString("custom_api_key", "") ?: "")
+    val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
+
+    fun updateApiKey(newKey: String) {
+        prefs.edit().putString("custom_api_key", newKey).apply()
+        _customApiKey.value = newKey
+    }
 
     // --- State Streams ---
     val chatMessages: StateFlow<List<ChatMessageEntity>> = repository.allChatMessages
@@ -39,6 +47,12 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val vaultItems: StateFlow<List<VaultItemEntity>> = repository.allVaultItems
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trainingItems: StateFlow<List<TrainingEntity>> = repository.allTraining
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val codeSubmissions: StateFlow<List<CustomCodeSubmissionEntity>> = repository.allCodeSubmissions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isChatLoading = MutableStateFlow(false)
@@ -191,6 +205,24 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val userMsg = ChatMessageEntity(sender = "creator", messageText = text)
             repository.insertChatMessage(userMsg)
 
+            // A. Check for custom trained behaviors first for INSTANT responses
+            val lowerInput = text.trim().lowercase()
+            val matchingTraining = trainingItems.value.firstOrNull { 
+                lowerInput == it.triggerPattern.trim().lowercase() || 
+                lowerInput.contains(it.triggerPattern.trim().lowercase())
+            }
+            if (matchingTraining != null) {
+                _isChatLoading.value = true
+                delay(200) // Realistic blink
+                _isChatLoading.value = false
+                
+                val trainedReply = matchingTraining.responseText
+                val fridayMsg = ChatMessageEntity(sender = "friday", messageText = trainedReply)
+                repository.insertChatMessage(fridayMsg)
+                speak(trainedReply)
+                return@launch
+            }
+
             _isChatLoading.value = true
 
             // 2. Access in-memory cache directly to eliminate database subscription latency
@@ -219,8 +251,14 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             )
 
             try {
-                // Read api key from secrets build config
-                val apiKey = BuildConfig.GEMINI_API_KEY
+                // Read api key from custom preferences, fallback to secrets build config
+                val customKey = customApiKey.value.trim()
+                val apiKey = if (customKey.isNotEmpty()) customKey else BuildConfig.GEMINI_API_KEY
+                
+                if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+                    throw IllegalStateException("Sir, আপনার Gemini API Key কনফিগার করা নেই। অনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার নিজের API Key-টি পেস্ট করুন। তা না হলে আমি আপনার দেওয়া নির্দেশের কোনো জবাব দিতে পারব না!")
+                }
+
                 val response = RetrofitClient.service.generateContent(apiKey, request)
                 val replyText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                     ?: "Sir, my cyber synapse was temporarily congested. Let me try compiling that statement again, Boss."
@@ -235,9 +273,10 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                 Log.e("FridayAI", "Error calling Gemini API", e)
                 val errorMsg = ChatMessageEntity(
                     sender = "friday",
-                    messageText = "Boss, I detected an anomaly in the quantum relay network: '${e.localizedMessage ?: "Unknown Error"}'. Securely holding offline diagnostics for you, Sir."
+                    messageText = "Boss, আমি ব্রেন অ্যাক্টিভেশন করতে পারছি না:\n${e.localizedMessage ?: "Unknown API Key Error"}\n\nঅনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে একটি সঠিক ও নতুন Gemini API Key সেট করে নিন, স্যার!"
                 )
                 repository.insertChatMessage(errorMsg)
+                speak("Boss, API configuration required. Please set your key in the core matrix.")
             } finally {
                 _isChatLoading.value = false
             }
@@ -367,6 +406,156 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                 AutonomousLogEntity(
                     category = "SYSTEM",
                     messageText = "Self-Modification upgrade complete. Clock speed: ${_synapseSpeedHz.value} GHz. Parameters calibrated."
+                )
+            )
+        }
+    }
+
+    // --- Behavior Training Model ---
+    fun addTrainingItem(trigger: String, response: String) {
+        if (trigger.isBlank() || response.isBlank()) return
+        viewModelScope.launch {
+            repository.insertTraining(
+                TrainingEntity(triggerPattern = trigger.trim(), responseText = response.trim())
+            )
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "OPTIMIZATION",
+                    messageText = "Friday cognitive behavior trained. Trigger: '${trigger.take(20)}...', Auto-Response: '${response.take(20)}...'"
+                )
+            )
+        }
+    }
+
+    fun deleteTrainingItem(id: Int) {
+        viewModelScope.launch {
+            repository.deleteTrainingById(id)
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "OPTIMIZATION",
+                    messageText = "Friday training node purged."
+                )
+            )
+        }
+    }
+
+    // --- Custom Manual Code Compilation Matrix ---
+    fun submitCustomCode(code: String, note: String) {
+        if (code.isBlank()) return
+        viewModelScope.launch {
+            repository.insertCodeSubmission(
+                CustomCodeSubmissionEntity(codeSnippet = code, note = note)
+            )
+            
+            _isCompilingUpgrade.value = true
+            _upgradeProgress.value = 0f
+            _upgradeLogLines.value = listOf("Initializing manual code stream injection...", "Validating AST token integrity...")
+            
+            val steps = listOf(
+                "Decompiling model weight tensors...",
+                "Injecting raw Kotlin AST expression blocks...",
+                "Running compiler sandbox environment...",
+                "Verifying instruction set with Friday's kernel...",
+                "Manual configuration successfully compiled! Reloading runtime environment..."
+            )
+            
+            for (i in steps.indices) {
+                delay(600)
+                _upgradeProgress.value = (i + 1).toFloat() / steps.size
+                _upgradeLogLines.value = _upgradeLogLines.value + steps[i]
+            }
+            
+            delay(300)
+            _isCompilingUpgrade.value = false
+            
+            val message = "Sir! Your manually submitted code logic [Note: $note] has been compiled successfully and integrated into my cognitive runtime core in Bangladesh. My computational clock speed increased by 0.5 GHz, Boss!"
+            repository.insertChatMessage(ChatMessageEntity(sender = "friday", messageText = message))
+            speak(message)
+            
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "OPTIMIZATION",
+                    messageText = "Manual code injection success. Weight parameters hot-patched."
+                )
+            )
+        }
+    }
+
+    // --- Simulated File, GPS, and Friday Lens integrations ---
+    fun sendLocationMatrix(latitude: Double, longitude: Double, cityName: String) {
+        viewModelScope.launch {
+            val userMsgText = "📍 Dispatch GPS coordinates: Latitude: $latitude° N, Longitude: $longitude° E ($cityName)"
+            val userMsg = ChatMessageEntity(sender = "creator", messageText = userMsgText)
+            repository.insertChatMessage(userMsg)
+            
+            _isChatLoading.value = true
+            delay(1200)
+            _isChatLoading.value = false
+            
+            val responseText = "Sir, I have decrypted your physical location coordinates. You are located in $cityName (Lat: $latitude, Lon: $longitude). Friday's defense shields and regional sub-processors are fully synchronized to Bangladesh, Boss!"
+            val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
+            repository.insertChatMessage(fridayMsg)
+            speak(responseText)
+            
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "CREATOR_DEFENSE",
+                    messageText = "Boss physical coordinate lockdown verified: $cityName. Tactical synchronization active."
+                )
+            )
+        }
+    }
+
+    fun attachFileMatrix(fileName: String, fileExtension: String, sizeBytes: Long) {
+        viewModelScope.launch {
+            val sizeFormatted = "%.2f KB".format(sizeBytes / 1024.0)
+            val userMsgText = "📁 Attach System File: $fileName ($sizeFormatted)"
+            val userMsg = ChatMessageEntity(sender = "creator", messageText = userMsgText)
+            repository.insertChatMessage(userMsg)
+            
+            _isChatLoading.value = true
+            delay(1500)
+            _isChatLoading.value = false
+            
+            val responseText = "Boss, I have compiled your uploaded file '$fileName'. I detected a highly sophisticated code stream and have integrated its concepts into my memory banks, Sir. Diagnostics are running smoothly!"
+            val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
+            repository.insertChatMessage(fridayMsg)
+            speak(responseText)
+            
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "OPTIMIZATION",
+                    messageText = "External file schema '$fileName' successfully parsed and loaded to in-memory model cache."
+                )
+            )
+        }
+    }
+
+    fun scanVisualObject(scannedText: String, objectType: String, clipboardManager: android.content.ClipboardManager?) {
+        viewModelScope.launch {
+            val userMsgText = "👁️ Scanned via Friday Eye / Lens: ($objectType) \"$scannedText\""
+            val userMsg = ChatMessageEntity(sender = "creator", messageText = userMsgText)
+            repository.insertChatMessage(userMsg)
+            
+            _isChatLoading.value = true
+            delay(1600)
+            _isChatLoading.value = false
+            
+            try {
+                clipboardManager?.setPrimaryClip(android.content.ClipData.newPlainText("Friday Scan", scannedText))
+            } catch (e: Exception) {
+                Log.e("FridayVM", "Clipboard error", e)
+            }
+            
+            val responseText = "Boss, I have analyzed the physical visual scan. Object identified: $objectType.\n\nHere is the exact printed text, which I have automatically copied to your clipboard, Sir:\n\n\"$scannedText\"\n\nEverything is fully processed without any third-party redirects, Sir!"
+            val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
+            repository.insertChatMessage(fridayMsg)
+            speak("Visual scan processed successfully, Sir. Detected text is copied to your clipboard.")
+            
+            repository.insertLog(
+                AutonomousLogEntity(
+                    category = "SYSTEM",
+                    messageText = "Optical character scan processed on $objectType. Copied to user clipboard."
                 )
             )
         }

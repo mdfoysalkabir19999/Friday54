@@ -38,4 +38,24 @@ interface FridayDao {
 
     @Query("DELETE FROM vault_items WHERE id = :id")
     suspend fun deleteVaultItemById(id: Int)
+
+    // --- Friday Training ---
+    @Query("SELECT * FROM friday_training ORDER BY timestamp DESC")
+    fun getAllTraining(): Flow<List<TrainingEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTraining(item: TrainingEntity)
+
+    @Query("DELETE FROM friday_training WHERE id = :id")
+    suspend fun deleteTrainingById(id: Int)
+
+    // --- Custom Code Submissions ---
+    @Query("SELECT * FROM custom_code_submissions ORDER BY timestamp DESC")
+    fun getAllCodeSubmissions(): Flow<List<CustomCodeSubmissionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCodeSubmission(item: CustomCodeSubmissionEntity)
+
+    @Query("DELETE FROM custom_code_submissions")
+    suspend fun clearAllCodeSubmissions()
 }

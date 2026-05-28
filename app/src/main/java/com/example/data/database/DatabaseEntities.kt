@@ -27,3 +27,20 @@ data class VaultItemEntity(
     val secretContent: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "friday_training")
+data class TrainingEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val triggerPattern: String,
+    val responseText: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "custom_code_submissions")
+data class CustomCodeSubmissionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val codeSnippet: String,
+    val note: String,
+    val isCompiled: Boolean = true,
+    val timestamp: Long = System.currentTimeMillis()
+)
