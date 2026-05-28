@@ -257,6 +257,73 @@ fun MatrixScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                     }
                 }
 
+                // --- Active Cognitive Model Card ---
+                val currentModel by viewModel.customModel.collectAsState()
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberCard, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = CyberCard.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Psychology, contentDescription = "Model Settings", tint = CyberSecondary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "🧠 ACTIVE COGNITIVE MODEL",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Text(
+                            text = "আপনার API Key এর টাইপ অনুযায়ী সঠিক মডেলটি সিলেক্ট করুন। ফ্রী বা সাধারণ API Key-এর জন্য 'gemini-1.5-flash' বা 'gemini-2.0-flash' রান করা সবচেয়ে ভালো:",
+                            fontSize = 11.sp,
+                            color = Color.LightGray,
+                            lineHeight = 15.sp
+                        )
+
+                        Text(
+                            text = "✓ Cognition Core: $currentModel",
+                            color = Color.Green,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("gemini-1.5-flash", "gemini-2.0-flash").forEach { modelName ->
+                                Button(
+                                    onClick = { viewModel.updateCustomModel(modelName) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (currentModel == modelName) CyberSecondary else CyberSecondary.copy(alpha = 0.15f)
+                                    ),
+                                    border = BorderStroke(1.dp, CyberSecondary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).height(38.dp)
+                                ) {
+                                    Text(
+                                        text = modelName.uppercase(),
+                                        color = if (currentModel == modelName) Color.Black else CyberSecondary,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // --- DESIGN PATTERN: CREATOR DETAILED SECURITY DOSSIER ---
                 Card(
                     modifier = Modifier

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -37,6 +38,14 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
     fun updateApiKey(newKey: String) {
         prefs.edit().putString("custom_api_key", newKey).apply()
         _customApiKey.value = newKey
+    }
+
+    private val _customModel = MutableStateFlow(prefs.getString("custom_model", "gemini-1.5-flash") ?: "gemini-1.5-flash")
+    val customModel: StateFlow<String> = _customModel.asStateFlow()
+
+    fun updateCustomModel(newModel: String) {
+        prefs.edit().putString("custom_model", newModel).apply()
+        _customModel.value = newModel
     }
 
     // --- State Streams ---
@@ -101,25 +110,27 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
     private var autonomousJob: Job? = null
 
     init {
-        // Initialize TTS
-        textToSpeech = TextToSpeech(application, this)
+        // Initialize TTS safely to avoid crashes on nodes without TTS engines
+        try {
+            textToSpeech = TextToSpeech(application, this)
+        } catch (e: Exception) {
+            Log.e("FridayVM", "Could not initialize TextToSpeech", e)
+        }
 
         // Seed initial conversations & logs if database is empty
         viewModelScope.launch {
-            delay(1000)
-            repository.allChatMessages.collect { list ->
-                if (list.isEmpty()) {
-                    seedInitialChat()
-                }
+            delay(100)
+            val list = repository.allChatMessages.first()
+            if (list.isEmpty()) {
+                seedInitialChat()
             }
         }
 
         viewModelScope.launch {
-            delay(1500)
-            repository.allLogs.collect { list ->
-                if (list.isEmpty()) {
-                    seedInitialLogs()
-                }
+            delay(200)
+            val list = repository.allLogs.first()
+            if (list.isEmpty()) {
+                seedInitialLogs()
             }
         }
 
@@ -259,7 +270,16 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                     throw IllegalStateException("Sir, আপনার Gemini API Key কনফিগার করা নেই। অনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার নিজের API Key-টি পেস্ট করুন। তা না হলে আমি আপনার দেওয়া নির্দেশের কোনো জবাব দিতে পারব না!")
                 }
 
-                val response = RetrofitClient.service.generateContent(apiKey, request)
+                val model = customModel.value.trim().ifEmpty { "gemini-1.5-flash" }
+
+                val response = try {
+                    RetrofitClient.service.generateContent(model, apiKey, request)
+                } catch (apiEx: Exception) {
+                    val fallbackModel = if (model == "gemini-1.5-flash") "gemini-2.0-flash" else "gemini-1.5-flash"
+                    Log.w("FridayAI", "Model $model failed, trying fallback model $fallbackModel", apiEx)
+                    RetrofitClient.service.generateContent(fallbackModel, apiKey, request)
+                }
+
                 val replyText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                     ?: "Sir, my cyber synapse was temporarily congested. Let me try compiling that statement again, Boss."
 
@@ -271,12 +291,44 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
 
             } catch (e: Exception) {
                 Log.e("FridayAI", "Error calling Gemini API", e)
+                val errorExplanation = when (e) {
+                    is retrofit2.HttpException -> {
+                        val code = e.code()
+                        val rawError = try {
+                            e.response()?.errorBody()?.string()
+                        } catch (ex: Exception) {
+                            null
+                        }
+                        
+                        val parsedMessage = if (!rawError.isNullOrBlank()) {
+                            if (rawError.contains("\"message\"")) {
+                                val regex = Regex("\"message\"\\s*:\\s*\"([^\"]+)\"")
+                                regex.find(rawError)?.groupValues?.get(1) ?: rawError
+                            } else {
+                                rawError
+                            }
+                        } else {
+                            e.message()
+                        }
+
+                        when (code) {
+                            400 -> "HTTP 400 (Bad Request): Boss, রিকোয়েস্ট ফরম্যাট ভুল অথবা কী ইনভ্যালিড।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            403 -> "HTTP 403 (Forbidden): Boss, আপনার এই API Key-টি ব্লক হয়েছে অথবা এই কীতে API এনাবল করা নেই বা কান্ট্রি অ্যাসাইনমেন্টে বাধা আসছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            404 -> "HTTP 404 (Not Found): Boss, এই মডেলটি পাওয়া যায়নি। দয়া করে সঠিক মডেল সেট করুন।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            429 -> "HTTP 429 (Quota Exceeded): Boss, আপনার ব্যবহারের লিমিট শেষ হয়ে গেছে অথবা খুব দ্রুত অনেক বেশি রিকোয়েস্ট করা হয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
+                            else -> "HTTP $code Error: $parsedMessage"
+                        }
+                    }
+                    is java.net.UnknownHostException -> "ইন্টারনেট সংযোগ বিচ্ছিন্ন: Boss, অফলাইন মোডে ইন্টারনেটের অভাবে আমি ক্লাউড সার্ভারে কানেক্ট করতে পারছি না।"
+                    else -> e.localizedMessage ?: "Unknown Connection Error"
+                }
+                
                 val errorMsg = ChatMessageEntity(
                     sender = "friday",
-                    messageText = "Boss, আমি ব্রেন অ্যাক্টিভেশন করতে পারছি না:\n${e.localizedMessage ?: "Unknown API Key Error"}\n\nঅনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে একটি সঠিক ও নতুন Gemini API Key সেট করে নিন, স্যার!"
+                    messageText = "Boss, আমি ব্রেন অ্যাক্টিভেশন করতে পারছি না:\n\n$errorExplanation\n\nঅনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার Key ভেরিফাই করুন বা নতুন Key সেট করুন, স্যার!"
                 )
                 repository.insertChatMessage(errorMsg)
-                speak("Boss, API configuration required. Please set your key in the core matrix.")
+                speak("Boss, API configuration issue. Let's verify details in the core matrix.")
             } finally {
                 _isChatLoading.value = false
             }

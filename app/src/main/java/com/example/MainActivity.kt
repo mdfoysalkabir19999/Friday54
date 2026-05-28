@@ -4,7 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -42,20 +46,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FridayAppContainer(
     viewModel: FridayViewModel = viewModel()
 ) {
     var selectedTab by remember { mutableStateOf(0) }
+    val isKeyboardVisible = WindowInsets.isImeVisible
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar(
-                containerColor = CyberCard,
-                tonalElevation = 8.dp,
-                modifier = Modifier.testTag("friday_bottom_navigation")
-            ) {
+            if (!isKeyboardVisible) {
+                NavigationBar(
+                    containerColor = CyberCard,
+                    tonalElevation = 8.dp,
+                    modifier = Modifier.testTag("friday_bottom_navigation")
+                ) {
                 // Tab 0: Neuro-Core
                 NavigationBarItem(
                     selected = selectedTab == 0,
@@ -121,7 +128,8 @@ fun FridayAppContainer(
                 )
             }
         }
-    ) { innerPadding ->
+    }
+) { innerPadding ->
         when (selectedTab) {
             0 -> CoreScreen(viewModel = viewModel, paddingValues = innerPadding)
             1 -> LogsScreen(viewModel = viewModel, paddingValues = innerPadding)
