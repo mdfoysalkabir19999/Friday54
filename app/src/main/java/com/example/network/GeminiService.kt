@@ -28,7 +28,14 @@ data class MoshiContent(
 
 @JsonClass(generateAdapter = true)
 data class MoshiPart(
-    @Json(name = "text") val text: String
+    @Json(name = "text") val text: String? = null,
+    @Json(name = "inlineData") val inlineData: MoshiInlineData? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class MoshiInlineData(
+    @Json(name = "mimeType") val mimeType: String,
+    @Json(name = "data") val data: String
 )
 
 @JsonClass(generateAdapter = true)

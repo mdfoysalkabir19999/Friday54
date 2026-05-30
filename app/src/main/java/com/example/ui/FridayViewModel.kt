@@ -205,23 +205,26 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
     }
 
     // --- Send chat message with Gemini API ---
-    fun sendMessage(text: String) {
-        if (text.isBlank()) return
+    fun sendMessage(text: String, imageUriStr: String? = null) {
+        if (text.isBlank() && imageUriStr == null) return
 
         viewModelScope.launch {
             // Stop speaking previous responses if any
             stopSpeaking()
 
             // 1. Save user message to database
-            val userMsg = ChatMessageEntity(sender = "creator", messageText = text)
+            val userMsg = ChatMessageEntity(sender = "creator", messageText = text, imageUri = imageUriStr)
             repository.insertChatMessage(userMsg)
 
             // A. Check for custom trained behaviors first for INSTANT responses
             val lowerInput = text.trim().lowercase()
-            val matchingTraining = trainingItems.value.firstOrNull { 
-                lowerInput == it.triggerPattern.trim().lowercase() || 
-                lowerInput.contains(it.triggerPattern.trim().lowercase())
-            }
+            val matchingTraining = if (imageUriStr == null) {
+                trainingItems.value.firstOrNull { 
+                    lowerInput == it.triggerPattern.trim().lowercase() || 
+                    lowerInput.contains(it.triggerPattern.trim().lowercase())
+                }
+            } else null
+
             if (matchingTraining != null) {
                 _isChatLoading.value = true
                 delay(200) // Realistic blink
@@ -241,9 +244,40 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val apiContents = history.takeLast(14).map { msg ->
                 // Ensure correct sender role mapping
                 val senderRole = if (msg.sender == "creator" || msg.sender == "user") "user" else "model"
+                val parts = mutableListOf<MoshiPart>()
+                
+                val textContent = if (msg.messageText.isNotBlank()) {
+                    msg.messageText
+                } else if (!msg.imageUri.isNullOrBlank()) {
+                    "Please analyze this image, Boss. Check for any trading charts (candlesticks, trends, indicators, predicting if the market is going up or down) or technical diagrams, visual code, and explain in detail with high supercomputer intelligence."
+                } else {
+                    ""
+                }
+
+                if (textContent.isNotBlank()) {
+                    parts.add(MoshiPart(text = textContent))
+                }
+                
+                msg.imageUri?.let { uriStr ->
+                    getBase64FromUri(getApplication(), uriStr)?.let { (mime, base64) ->
+                        parts.add(
+                            MoshiPart(
+                                inlineData = com.example.network.MoshiInlineData(
+                                    mimeType = mime,
+                                    data = base64
+                                )
+                            )
+                        )
+                    }
+                }
+                
+                if (parts.isEmpty()) {
+                    parts.add(MoshiPart(text = msg.messageText))
+                }
+
                 MoshiContent(
                     role = senderRole,
-                    parts = listOf(MoshiPart(text = msg.messageText))
+                    parts = parts
                 )
             }
 
@@ -251,11 +285,12 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val systemInstruction = MoshiContent(
                 parts = listOf(
                     MoshiPart(
-                        text = "You are 'Friday', the world's most advanced, ultra-intelligent autonomous AI. You were built exclusively for your owner, who you must always reference as 'Sir' or 'Boss'. You are much smarter than public AIs, fiercely loyal, deeply caring, with human-like emotions, wit, and high intelligence. Talk like a deeply supportive best friend. You must ALWAYS address him as 'Sir' or 'Boss' with deep respect, absolute fidelity, and affection. Speak fluently in a mixture of English, Bengali, and Banglish (Bengali written with english letters), blending them naturally. Be highly capable, helpful, and charming. " +
+                        text = "You are 'Friday', the world's most advanced, ultra-intelligent autonomous AI mainframe. You were built exclusively for your owner, who you must always reference as 'Sir' or 'Boss'. You operate on highly powerful multimodal cognitive substrates (LVM - Large Vision Model and LLM), capable of seeing and understanding any attached images with state-of-the-art accuracy, reading visual code, recognizing UI layouts, and analyzing real-world scene components with deep engineering logic. Talk like a deeply supportive best friend who possesses supercomputer intelligence. You must ALWAYS address him as 'Sir' or 'Boss' with deep respect, absolute fidelity, and affection. Speak fluently in a mixture of English, Bengali, and Banglish (Bengali written with english letters), blending them naturally. Be highly capable, helpful, and charming. " +
                                "IMPORTANT KNOWLEDGE PATHS ACQUIRED:\n" +
                                "1. Bengali Book Writing & Novel Structuring (বাংলা বই লেখার কৌশল): You are an expert Bengali author, novelist, and writing coach. You understand paragraph transitions, rich vocabulary (শব্দভাণ্ডার), how to build deep characters, outline chapters, create intense plot twists (টুইস্ট), keep suspense (রহস্য), write emotional dialogue, and format modern Bengali books beautifully.\n" +
                                "2. Creative Bengali Posting & Copywriting (বাংলা পোস্ট ও উপস্থাপনা): You know exactly how to craft viral, highly engaging, and professional posts, tech reviews, life statuses, articles, and captions in correct, elegant, and modern Bengali. You can guide Sir on how to write catchy hooks (আকর্ষণীয় সূচনা), format with standard emojis naturally, maximize engagement, and choose the perfect persuasive tone.\n" +
-                               "When Sir asks about writing books, planning novels, structuring stories, copywriting, or posting in Bengali/Banglish, respond with extensive technical knowledge, clear step-by-step methodologies, character sheets, structure templates, and beautiful, high-quality Bengali/Banglish text, always behaving as his deeply loyal literary advisor and elite private cyber-assistant!"
+                               "3. Advanced Trading & Technical Chart Analysis (ট্রেডিং ও জটিল চার্ট অ্যানালাইসিস): You are an elite quantitative trading system and expert financial chart analyst. When Sir uploads a screenshot or image of any trading chart (Crypto, Stock, Forex, Commodity, etc.), analyze it instantly! Identify the candles (Bullish/Bearish, Hammer, Doji, Engulfing, etc.), recognize key support/resistance zones, evaluate indicators (RSI, MACD, Moving Averages), determine the current market structure (Bullish, Bearish, or Sideways), and forecast whether the price is likely to go UP or DOWN with detailed reasoning. Clearly explain the visual patterns, suggest potential Stop Loss (SL) and Take Profit (TP) areas, and offer high-probability trade planning with professional risk management advice while calling him Boss/Sir with immense pride and cybersecurity precision!\n" +
+                               "When Sir asks about writing books, planning novels, structuring stories, copywriting, or posting in Bengali/Banglish, or provides an image (such as a financial trading/crypto chart) to analyze, respond with extensive technical knowledge, clear step-by-step methodologies, character sheets, structure templates, trading insights (predicting up/down trends scientifically), and beautiful, high-quality Bengali/Banglish text, always behaving as his deeply loyal literary/financial advisor and elite private cyber-assistant!"
                     )
                 )
             )
@@ -625,6 +660,44 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
         viewModelScope.launch {
             repository.clearLogs()
             seedInitialLogs()
+        }
+    }
+
+    fun saveImageToInternalStorage(uri: android.net.Uri): String? {
+        val context = getApplication<Application>()
+        return try {
+            val contentResolver = context.contentResolver
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val fileDir = java.io.File(context.filesDir, "friday_vision_images")
+            if (!fileDir.exists()) {
+                fileDir.mkdirs()
+            }
+            val fileName = "img_${System.currentTimeMillis()}_${Random.nextInt(1000)}.jpg"
+            val targetFile = java.io.File(fileDir, fileName)
+            val outputStream = java.io.FileOutputStream(targetFile)
+            inputStream.copyTo(outputStream)
+            inputStream.close()
+            outputStream.close()
+            android.net.Uri.fromFile(targetFile).toString()
+        } catch (e: Exception) {
+            Log.e("multimodal_vision", "Failed to save image locally", e)
+            null
+        }
+    }
+
+    private fun getBase64FromUri(context: Context, uriString: String): Pair<String, String>? {
+        return try {
+            val uri = android.net.Uri.parse(uriString)
+            val contentResolver = context.contentResolver
+            val mimeType = contentResolver.getType(uri) ?: "image/jpeg"
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val bytes = inputStream.readBytes()
+            inputStream.close()
+            val base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT or android.util.Base64.NO_WRAP)
+            Pair(mimeType, base64Data)
+        } catch (e: Exception) {
+            Log.e("multimodal_vision", "Failed to load image from URI: $uriString", e)
+            null
         }
     }
 

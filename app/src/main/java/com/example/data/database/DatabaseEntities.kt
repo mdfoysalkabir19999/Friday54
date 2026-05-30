@@ -8,7 +8,8 @@ data class ChatMessageEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val sender: String, // "creator" or "friday"
     val messageText: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val imageUri: String? = null
 )
 
 @Entity(tableName = "autonomous_logs")

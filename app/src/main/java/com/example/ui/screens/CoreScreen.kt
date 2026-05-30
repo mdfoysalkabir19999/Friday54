@@ -183,6 +183,18 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
     var showAttachmentSourceDialog by remember { mutableStateOf(false) }
     var selectedOcrText by remember { mutableStateOf("Position camera over newspapers, books or code...") }
     var selectedObjectType by remember { mutableStateOf("Searching...") }
+    var attachedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val chatImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val localPath = viewModel.saveImageToInternalStorage(uri)
+            if (localPath != null) {
+                attachedImageUri = android.net.Uri.parse(localPath)
+            }
+        }
+    }
 
     // REAL File Picker launcher
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -686,6 +698,33 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("FRIDAY LENS", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                             }
+
+                            // Cognitive Vision Image Node
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable {
+                                        showAttachmentMenu = false
+                                        try {
+                                            chatImagePickerLauncher.launch("image/*")
+                                        } catch (e: Exception) {
+                                            Log.e("CoreScreen", "Error launching gallery", e)
+                                        }
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(CyberDark, CircleShape)
+                                        .border(1.dp, CyberPrimary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Image, contentDescription = "Cognitive Vision Image", tint = CyberPrimary, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("COGNITIVE EYE", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            }
                         }
                     }
                 }
@@ -695,58 +734,114 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                     modifier = Modifier.fillMaxWidth(),
                     color = CyberSurface
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextField(
-                            value = textInput,
-                            onValueChange = { textInput = it },
-                            placeholder = { Text("Compile directive to Friday...", color = Color.Gray, fontSize = 13.sp) },
-                            leadingIcon = {
-                                IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
-                                    Icon(
-                                        imageVector = Icons.Default.AttachFile,
-                                        contentDescription = "Attach resource matrices",
-                                        tint = CyberPrimary,
-                                        modifier = Modifier.size(20.dp)
+                    Column {
+                        // Image attachment preview ribbon
+                        if (attachedImageUri != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(CyberDark)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(1.dp, CyberSecondary, RoundedCornerShape(8.dp))
+                                ) {
+                                    coil.compose.AsyncImage(
+                                        model = attachedImageUri,
+                                        contentDescription = "Attached visual matrix preview",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                     )
                                 }
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .border(1.dp, CyberCard, RoundedCornerShape(20.dp))
-                                .testTag("chat_input"),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = CyberCard.copy(alpha = 0.6f),
-                                unfocusedContainerColor = CyberCard.copy(alpha = 0.4f),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            maxLines = 4
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        FloatingActionButton(
-                            onClick = {
-                                if (textInput.isNotBlank()) {
-                                    viewModel.sendMessage(textInput)
-                                    textInput = ""
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "COGNITIVE EYE: OPTICAL TARGET LOCKED",
+                                        color = CyberSecondary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "Target image queued. Type query and transmit.",
+                                        color = Color.LightGray,
+                                        fontSize = 9.sp
+                                    )
                                 }
-                            },
-                            containerColor = CyberPrimary,
-                            contentColor = Color.Black,
-                            shape = CircleShape,
+                                IconButton(
+                                    onClick = { attachedImageUri = null },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Purge target image",
+                                        tint = WarningRed,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            HorizontalDivider(color = CyberCard, thickness = 1.dp)
+                        }
+
+                        Row(
                             modifier = Modifier
-                                .size(48.dp)
-                                .testTag("send_button")
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send directive", modifier = Modifier.size(18.dp))
+                            TextField(
+                                value = textInput,
+                                onValueChange = { textInput = it },
+                                placeholder = { Text("Compile directive to Friday...", color = Color.Gray, fontSize = 13.sp) },
+                                leadingIcon = {
+                                    IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
+                                        Icon(
+                                            imageVector = Icons.Default.AttachFile,
+                                            contentDescription = "Attach resource matrices",
+                                            tint = CyberPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .border(1.dp, CyberCard, RoundedCornerShape(20.dp))
+                                    .testTag("chat_input"),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = CyberCard.copy(alpha = 0.6f),
+                                    unfocusedContainerColor = CyberCard.copy(alpha = 0.4f),
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                maxLines = 4
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            FloatingActionButton(
+                                onClick = {
+                                    if (textInput.isNotBlank() || attachedImageUri != null) {
+                                        viewModel.sendMessage(textInput, attachedImageUri?.toString())
+                                        textInput = ""
+                                        attachedImageUri = null
+                                    }
+                                },
+                                containerColor = CyberPrimary,
+                                contentColor = Color.Black,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag("send_button")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send directive", modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
@@ -1261,13 +1356,30 @@ fun ChatBubbleItem(message: ChatMessageEntity) {
                 border = BorderStroke(1.dp, borderCol),
                 modifier = Modifier.testTag("chat_bubble_${message.id}")
             ) {
-                Text(
-                    text = message.messageText,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(14.dp),
-                    lineHeight = 21.sp
-                )
+                Column {
+                    message.imageUri?.let { uriStr ->
+                        coil.compose.AsyncImage(
+                            model = uriStr,
+                            contentDescription = "Sovereign optic sensory target",
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, CyberPrimary.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
+                    if (message.messageText.isNotBlank()) {
+                        Text(
+                            text = message.messageText,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(14.dp),
+                            lineHeight = 21.sp
+                        )
+                    }
+                }
             }
         }
     }

@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         TrainingEntity::class,
         CustomCodeSubmissionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class FridayDatabase : RoomDatabase() {
