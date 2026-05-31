@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 
 import android.util.Log
 
-fun getCityNameFromCoordinates(context: android.content.Context, lat: Double, lon: Double): String {
+suspend fun getCityNameFromCoordinates(context: android.content.Context, lat: Double, lon: Double): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     var city = "Dhaka, Bangladesh"
     try {
         val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
@@ -76,10 +76,14 @@ fun getCityNameFromCoordinates(context: android.content.Context, lat: Double, lo
     } catch (e: Exception) {
         Log.e("GPS", "Geocoder error", e)
     }
-    return city
+    city
 }
 
-fun fetchDeviceLocation(context: android.content.Context, onLocationAvailable: (Double, Double, String) -> Unit) {
+fun fetchDeviceLocation(
+    context: android.content.Context,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    onLocationAvailable: (Double, Double, String) -> Unit
+) {
     val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
     if (locationManager == null) {
         onLocationAvailable(23.8103, 90.4125, "Dhaka, Bangladesh")
@@ -94,74 +98,86 @@ fun fetchDeviceLocation(context: android.content.Context, onLocationAvailable: (
         return
     }
     
-    try {
-        val isGpsEnabled = try {
-            locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
-        } catch (e: Exception) {
-            false
-        }
-        val isNetworkEnabled = try {
-            locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
-        } catch (e: Exception) {
-            false
-        }
-        
-        val providers = try { locationManager.getProviders(true) } catch (e: Exception) { emptyList<String>() }
-        var bestLocation: android.location.Location? = null
-        
-        for (provider in providers) {
-            try {
-                val loc = locationManager.getLastKnownLocation(provider) ?: continue
-                if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
-                    bestLocation = loc
-                }
+    coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val isGpsEnabled = try {
+                locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
             } catch (e: Exception) {
-                Log.e("GPS", "Error reading last known location from $provider", e)
+                false
             }
-        }
-        
-        if (bestLocation == null) {
-            try {
-                val passiveLoc = locationManager.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)
-                if (passiveLoc != null) {
-                    bestLocation = passiveLoc
-                }
+            val isNetworkEnabled = try {
+                locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
             } catch (e: Exception) {
-                Log.e("GPS", "Error reading last known location from passive", e)
+                false
             }
-        }
-        
-        if (bestLocation != null) {
-            val lat = bestLocation.latitude
-            val lon = bestLocation.longitude
-            val city = getCityNameFromCoordinates(context, lat, lon)
-            onLocationAvailable(lat, lon, city)
-            return
-        }
-        
-        val activeProvider = providers.firstOrNull { 
-            it != android.location.LocationManager.PASSIVE_PROVIDER 
-        } ?: if (isNetworkEnabled) android.location.LocationManager.NETWORK_PROVIDER else android.location.LocationManager.GPS_PROVIDER
-        
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            try {
-                locationManager.requestSingleUpdate(activeProvider, object : android.location.LocationListener {
-                    override fun onLocationChanged(loc: android.location.Location) {
-                        val city = getCityNameFromCoordinates(context, loc.latitude, loc.longitude)
-                        onLocationAvailable(loc.latitude, loc.longitude, city)
+            
+            val providers = try { locationManager.getProviders(true) } catch (e: Exception) { emptyList<String>() }
+            var bestLocation: android.location.Location? = null
+            
+            for (provider in providers) {
+                try {
+                    val loc = locationManager.getLastKnownLocation(provider) ?: continue
+                    if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
+                        bestLocation = loc
                     }
-                    @Deprecated("Deprecated") override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
-                    override fun onProviderEnabled(p: String) {}
-                    override fun onProviderDisabled(p: String) {}
-                }, android.os.Looper.getMainLooper())
-            } catch (e: Exception) {
-                Log.e("GPS", "requestSingleUpdate failed dynamically", e)
+                } catch (e: Exception) {
+                    Log.e("GPS", "Error reading last known location from $provider", e)
+                }
+            }
+            
+            if (bestLocation == null) {
+                try {
+                    val passiveLoc = locationManager.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)
+                    if (passiveLoc != null) {
+                        bestLocation = passiveLoc
+                    }
+                } catch (e: Exception) {
+                    Log.e("GPS", "Error reading last known location from passive", e)
+                }
+            }
+            
+            if (bestLocation != null) {
+                val lat = bestLocation.latitude
+                val lon = bestLocation.longitude
+                val city = getCityNameFromCoordinates(context, lat, lon)
+                launch(kotlinx.coroutines.Dispatchers.Main) {
+                    onLocationAvailable(lat, lon, city)
+                }
+                return@launch
+            }
+            
+            val activeProvider = providers.firstOrNull { 
+                it != android.location.LocationManager.PASSIVE_PROVIDER 
+            } ?: if (isNetworkEnabled) android.location.LocationManager.NETWORK_PROVIDER else android.location.LocationManager.GPS_PROVIDER
+            
+            launch(kotlinx.coroutines.Dispatchers.Main) {
+                try {
+                    locationManager.requestSingleUpdate(activeProvider, object : android.location.LocationListener {
+                        override fun onLocationChanged(loc: android.location.Location) {
+                            coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                val city = getCityNameFromCoordinates(context, loc.latitude, loc.longitude)
+                                launch(kotlinx.coroutines.Dispatchers.Main) {
+                                    onLocationAvailable(loc.latitude, loc.longitude, city)
+                                }
+                            }
+                        }
+                        @Deprecated("Deprecated") override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
+                        override fun onProviderEnabled(p: String) {}
+                        override fun onProviderDisabled(p: String) {}
+                    }, android.os.Looper.getMainLooper())
+                } catch (e: Exception) {
+                    Log.e("GPS", "requestSingleUpdate failed dynamically", e)
+                    launch(kotlinx.coroutines.Dispatchers.Main) {
+                        onLocationAvailable(23.8103, 90.4125, "Dhaka, Bangladesh")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("GPS", "General process error getting location", e)
+            launch(kotlinx.coroutines.Dispatchers.Main) {
                 onLocationAvailable(23.8103, 90.4125, "Dhaka, Bangladesh")
             }
         }
-    } catch (e: Exception) {
-        Log.e("GPS", "General process error getting location", e)
-        onLocationAvailable(23.8103, 90.4125, "Dhaka, Bangladesh")
     }
 }
 
@@ -189,9 +205,11 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            val localPath = viewModel.saveImageToInternalStorage(uri)
-            if (localPath != null) {
-                attachedImageUri = android.net.Uri.parse(localPath)
+            coroutineScope.launch {
+                val localPath = viewModel.saveImageToInternalStorage(uri)
+                if (localPath != null) {
+                    attachedImageUri = android.net.Uri.parse(localPath)
+                }
             }
         }
     }
@@ -227,7 +245,7 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
 
     // GPS location fetcher
     val locationPermissionWithAction = {
-        fetchDeviceLocation(context) { lat, lon, city ->
+        fetchDeviceLocation(context, coroutineScope) { lat, lon, city ->
             viewModel.sendLocationMatrix(lat, lon, city)
         }
     }
@@ -252,10 +270,10 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
     ) { bitmap ->
         if (bitmap != null) {
             selectedObjectType = "Live Eye Lens Feed"
-            selectedOcrText = "COGNITIVE DETECTIONS:\nLive optical target processed. Color telemetry, ambient light intensity, and structure analysis are active. Everything is secure, Sir."
+            selectedOcrText = "COGNITIVE DETECTIONS:\nLive optical target processed. Color telemetry, ambient light intensity, and structure analysis are active. Everything is secure, Boss."
             showFridayLens = true
         } else {
-            viewModel.speak("Camera capture cancelled, Sir.")
+            viewModel.speak("Camera capture cancelled, Boss.")
         }
     }
 
@@ -270,13 +288,13 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                 Log.e("CameraLens", "Could not start camera after permission", e)
                 viewModel.speak("Camera system failed, Boss. Synchronizing to high-definition simulated scanner.")
                 selectedObjectType = "Live Eye Lens Feed (Mock)"
-                selectedOcrText = "COGNITIVE SCAN COMPLETE:\nLive feed simulated. Frame captures look clear, Sir."
+                selectedOcrText = "COGNITIVE SCAN COMPLETE:\nLive feed simulated. Frame captures look clear, Boss."
                 showFridayLens = true
             }
         } else {
             viewModel.speak("Camera visual authorization denied, Boss. Activating digital virtual sensor instead.")
             selectedObjectType = "Virtual Eye Feed"
-            selectedOcrText = "COGNITIVE SCAN (VIRTUAL MODE):\nSimulating deep structural analysis of physical surface. Matrix looks secure, Sir."
+            selectedOcrText = "COGNITIVE SCAN (VIRTUAL MODE):\nSimulating deep structural analysis of physical surface. Matrix looks secure, Boss."
             showFridayLens = true
         }
     }
@@ -287,7 +305,7 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
     ) { uri ->
         if (uri != null) {
             selectedObjectType = "Imported Optical Feed"
-            selectedOcrText = "DEEP SCAN Telemetry:\nAnalyzing imported imagery matrix... OCR layer initialized.\nFound pattern coordinates matches. System load within healthy margins, Sir."
+            selectedOcrText = "DEEP SCAN Telemetry:\nAnalyzing imported imagery matrix... OCR layer initialized.\nFound pattern coordinates matches. System load within healthy margins, Boss."
             showFridayLens = true
         }
     }
@@ -469,7 +487,7 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                     try {
                                         speechRecognizerLauncher.launch(intent)
                                     } catch (e: Exception) {
-                                        viewModel.speak("Voice recognition is not supported on this node, Sir.")
+                                        viewModel.speak("Voice recognition is not supported on this node, Boss.")
                                     }
                                 }
                             }
@@ -480,8 +498,8 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                         // Sophisticated Dark status subtitles below the orb
                         Text(
                             text = if (isThinking) "\"Boss, Friday is processing your request...\"" 
-                                   else if (isSpeaking) "\"Sir, streaming vocal synthesis lines...\"" 
-                                   else "\"Sir, শুক্রবার এখন সক্রিয়\"",
+                                   else if (isSpeaking) "\"Boss, streaming vocal synthesis lines...\"" 
+                                   else "\"Boss, Friday akhon fully active!\"",
                             color = CyberPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
@@ -522,12 +540,12 @@ fun CoreScreen(viewModel: FridayViewModel, paddingValues: PaddingValues) {
                                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-                                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Talk to Friday, Sir...")
+                                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Talk to Friday, Boss...")
                                         }
                                         try {
                                             speechRecognizerLauncher.launch(intent)
                                         } catch (e: Exception) {
-                                            viewModel.speak("Voice recognition is not supported on this node, Sir.")
+                                            viewModel.speak("Voice recognition is not supported on this node, Boss.")
                                         }
                                     }
                                     .border(1.dp, CyberPrimary.copy(alpha = 0.3f), RoundedCornerShape(24.dp))

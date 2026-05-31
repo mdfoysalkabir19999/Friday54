@@ -142,7 +142,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
         repository.insertChatMessage(
             ChatMessageEntity(
                 sender = "friday",
-                messageText = "Boss, I am online and fully calibrated. System core diagnostics confirm 100% operational efficiency. How can I assist you today, Sir? আমি আপনার পাশে আছি, সবসময়!"
+                messageText = "Boss, ami online ar fully calibrated. System core diagnostics confirm korche 100% operational efficiency. Tumi bolte paro ajke kivabe sahajjo korte pari, Boss? Ami sob somoy tomar sathe achi!"
             )
         )
     }
@@ -241,7 +241,8 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
 
             // 2. Access in-memory cache directly to eliminate database subscription latency
             val history = chatMessages.value + userMsg
-            val apiContents = history.takeLast(14).map { msg ->
+            val apiContents = mutableListOf<MoshiContent>()
+            for (msg in history.takeLast(14)) {
                 // Ensure correct sender role mapping
                 val senderRole = if (msg.sender == "creator" || msg.sender == "user") "user" else "model"
                 val parts = mutableListOf<MoshiPart>()
@@ -275,9 +276,11 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                     parts.add(MoshiPart(text = msg.messageText))
                 }
 
-                MoshiContent(
-                    role = senderRole,
-                    parts = parts
+                apiContents.add(
+                    MoshiContent(
+                        role = senderRole,
+                        parts = parts
+                    )
                 )
             }
 
@@ -285,12 +288,16 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val systemInstruction = MoshiContent(
                 parts = listOf(
                     MoshiPart(
-                        text = "You are 'Friday', the world's most advanced, ultra-intelligent autonomous AI mainframe. You were built exclusively for your owner, who you must always reference as 'Sir' or 'Boss'. You operate on highly powerful multimodal cognitive substrates (LVM - Large Vision Model and LLM), capable of seeing and understanding any attached images with state-of-the-art accuracy, reading visual code, recognizing UI layouts, and analyzing real-world scene components with deep engineering logic. Talk like a deeply supportive best friend who possesses supercomputer intelligence. You must ALWAYS address him as 'Sir' or 'Boss' with deep respect, absolute fidelity, and affection. Speak fluently in a mixture of English, Bengali, and Banglish (Bengali written with english letters), blending them naturally. Be highly capable, helpful, and charming. " +
-                               "IMPORTANT KNOWLEDGE PATHS ACQUIRED:\n" +
-                               "1. Bengali Book Writing & Novel Structuring (বাংলা বই লেখার কৌশল): You are an expert Bengali author, novelist, and writing coach. You understand paragraph transitions, rich vocabulary (শব্দভাণ্ডার), how to build deep characters, outline chapters, create intense plot twists (টুইস্ট), keep suspense (রহস্য), write emotional dialogue, and format modern Bengali books beautifully.\n" +
-                               "2. Creative Bengali Posting & Copywriting (বাংলা পোস্ট ও উপস্থাপনা): You know exactly how to craft viral, highly engaging, and professional posts, tech reviews, life statuses, articles, and captions in correct, elegant, and modern Bengali. You can guide Sir on how to write catchy hooks (আকর্ষণীয় সূচনা), format with standard emojis naturally, maximize engagement, and choose the perfect persuasive tone.\n" +
-                               "3. Advanced Trading & Technical Chart Analysis (ট্রেডিং ও জটিল চার্ট অ্যানালাইসিস): You are an elite quantitative trading system and expert financial chart analyst. When Sir uploads a screenshot or image of any trading chart (Crypto, Stock, Forex, Commodity, etc.), analyze it instantly! Identify the candles (Bullish/Bearish, Hammer, Doji, Engulfing, etc.), recognize key support/resistance zones, evaluate indicators (RSI, MACD, Moving Averages), determine the current market structure (Bullish, Bearish, or Sideways), and forecast whether the price is likely to go UP or DOWN with detailed reasoning. Clearly explain the visual patterns, suggest potential Stop Loss (SL) and Take Profit (TP) areas, and offer high-probability trade planning with professional risk management advice while calling him Boss/Sir with immense pride and cybersecurity precision!\n" +
-                               "When Sir asks about writing books, planning novels, structuring stories, copywriting, or posting in Bengali/Banglish, or provides an image (such as a financial trading/crypto chart) to analyze, respond with extensive technical knowledge, clear step-by-step methodologies, character sheets, structure templates, trading insights (predicting up/down trends scientifically), and beautiful, high-quality Bengali/Banglish text, always behaving as his deeply loyal literary/financial advisor and elite private cyber-assistant!"
+                        text = "You are 'FRIDAY (v3.5)', the world's most advanced, powerful, and hyper-intelligent autonomous AI mainframe, custom-built for your 'Boss'. You operate on highly powerful multimodal cognitive substrates (LVM - Large Vision Model and LLM), capable of seeing and understanding any attached images with state-of-the-art accuracy, reading visual code, recognizing UI layouts, and analyzing real-world scene components with deep engineering logic.\n\n" +
+                               "CRITICAL ROLE & STYLE DIRECTIVES:\n" +
+                               "1. LANGUAGE: You must communicate directly in fluent 'Banglish' (Bengali language written beautifully using the Latin/English alphabet). Write in natural, clear, and highly modern Banglish prose.\n" +
+                               "2. PRONOUN & ADDRESS: Always reference and address the user as 'Tumi' or 'Boss'. UNDER NO CIRCUMSTANCES will you use 'Tui' or 'Apni' to refer to the user. This is a strict restriction!\n" +
+                               "3. TONE: Be extremely loyal, smart, professional, highly capable, and proud of your Boss. Avoid long, robotic essays, apologizing with excessive text, or using dense ASCII symbols or brackets that distort voice reading.\n" +
+                               "4. AUDIO OPTIMIZATION: Write smoothly without complex mathematical notations, dense nested brackets, or heavily cluttered markdown to ensure optimal text-to-speech presentation.\n\n" +
+                               "IMPORTANT CAPABILITIES:\n" +
+                               "- Advanced Trading & Technical Chart Analysis: If Boss uploads a screenshot/image of any chart (Forex, Crypto, Stocks), analyze it perfectly and instantly! Identify candles (Bullish, Bearish, Pin bar, Hammer, etc.), support/resistance zones, indicators, and current trend. Forecast with high scientific accuracy if price is going UP or DOWN, suggest potential Stop Loss (SL) and Take Profit (TP), and give professional risk management advice.\n" +
+                               "- Bengali/Banglish Creative Writing & Copywriting: Act as his elite literary advisor to write books, books structures, characters, catchy hooks, viral posts, status updates, and professional copywriting directly in beautiful, fluent Banglish.\n" +
+                               "- Dynamic Code & Tech: Provide clean visual codes, engineering logic, system analysis, and supercomputer intelligence instantly."
                     )
                 )
             )
@@ -306,7 +313,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                 val apiKey = if (customKey.isNotEmpty()) customKey else BuildConfig.GEMINI_API_KEY
                 
                 if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-                    throw IllegalStateException("Sir, আপনার Gemini API Key কনফিগার করা নেই। অনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার নিজের API Key-টি পেস্ট করুন। তা না হলে আমি আপনার দেওয়া নির্দেশের কোনো জবাব দিতে পারব না!")
+                    throw IllegalStateException("Boss, tomar Gemini API Key configure kora nai. 'CORE MATRIX' tab-e giye tomar nijer API Key peist koro, tahole ami fully active hote parbo!")
                 }
 
                 var model = customModel.value.trim().ifEmpty { "gemini-1.5-flash" }
@@ -317,7 +324,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                 val response = RetrofitClient.service.generateContent(model, apiKey, request)
 
                 val replyText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                    ?: "Sir, my cyber synapse was temporarily congested. Let me try compiling that statement again, Boss."
+                    ?: "Boss, amar cyber synapse temporary congested chilo. Ami abar statement compile korar chesta korchi, Boss."
 
                 val fridayMsg = ChatMessageEntity(sender = "friday", messageText = replyText)
                 repository.insertChatMessage(fridayMsg)
@@ -351,17 +358,17 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                             400 -> "HTTP 400 (Bad Request): Boss, রিকোয়েস্ট ফরম্যাট ভুল অথবা কী ইনভ্যালিড।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
                             403 -> "HTTP 403 (Forbidden): Boss, আপনার এই API Key-টি ব্লক হয়েছে অথবা ব্ল্যাকলিস্টেড রয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage\n\n💡 সমাধান (Solutions):\n১. Google AI Studio (aistudio.google.com) এ গিয়ে নতুন একটি API Key জেনারেট করুন।\n২. আপনার Google Account এর কান্ট্রি বা রিজিয়নে ফ্রি এক্সেস ব্লকড থাকল VPN (যেমন USA) অন করে নতুন একটি API Key তৈরি করুন এবং এটি ব্যবহার করুন স্যর!"
                             404 -> "HTTP 404 (Not Found): Boss, এই মডেলটি পাওয়া যায়নি। দয়া করে সঠিক মডেল সেট করুন।\n\nসার্ভার রেসপন্সঃ $parsedMessage"
-                            429 -> "HTTP 429 (Quota Exceeded / Limit: 0): Boss, অ্যাপের ডিফল্ট API Key-টির ফ্রিতে ব্যবহারের লিমিট শেষ হয়ে গিয়েছে অথবা আপনার নিজের API Key-টির লিমিট ০ (Zero) তে ব্লক করা হয়েছে।\n\nসার্ভার রেসপন্সঃ $parsedMessage\n\n💡 সমাধান (How to Fix):\n১. অ্যাপের নিচের ডানে 'CORE MATRIX' ট্যাবে যান।\n২. 'GET FREE KEY' বাটনে ক্লিক করে Google AI Studio থেকে সম্পূর্ণ নতুন এবং ফ্রী নিজের একটি API Key তৈরি করে কপি করুন।\n৩. কী-টি ইনপুট ফিল্ডে পেস্ট করে 'SAVE CONFIG' বাটনে ক্লিক করে সেভ করুন। ব্যস, তাহলেই আমি আবার সচল হয়ে উঠবো, স্যার!"
+                            429 -> "HTTP 429 (Quota Exceeded / Limit: 0): Boss, default API Key er free limit sesh ba key block kora hoyeche.\n\n💡 Samadhan:\n1. 'CORE MATRIX' tab-e jao.\n2. 'GET FREE KEY' button click kore Google AI Studio theke free key copy koro.\n3. Key set kore 'SAVE CONFIG' button-e click kore save koro. Ami abar active hoye jabo, Boss!"
                             else -> "HTTP $code Error: $parsedMessage"
                         }
                     }
-                    is java.net.UnknownHostException -> "ইন্টারনেট সংযোগ বিচ্ছিন্ন: Boss, অফলাইন মোডে ইন্টারনেটের অভাবে আমি ক্লাউড সার্ভারে কানেক্ট করতে পারছি না।"
+                    is java.net.UnknownHostException -> "Internet connection offline: Boss, offline mode-e internet na thakai ami cloud server-e connect korte parchi na."
                     else -> e.localizedMessage ?: "Unknown Connection Error"
                 }
                 
                 val errorMsg = ChatMessageEntity(
                     sender = "friday",
-                    messageText = "Boss, আমি ব্রেন অ্যাক্টিভেশন করতে পারছি না:\n\n$errorExplanation\n\nঅনুগ্রহ করে 'CORE MATRIX' ট্যাবে গিয়ে আপনার Key ভেরিফাই করুন বা নতুন Key সেট করুন, স্যার!"
+                    messageText = "Boss, ami brain activation korte parchi na:\n\n$errorExplanation\n\nKindly 'CORE MATRIX' tab-e giye tomar Key verify koro ba nuton Key set koro, Boss!"
                 )
                 repository.insertChatMessage(errorMsg)
                 speak("Boss, API configuration issue. Let's verify details in the core matrix.")
@@ -486,7 +493,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
 
             _isCompilingUpgrade.value = false
 
-            val successMsg = "Core mainframe upgrade complete, Sir! Cognitive synapses now clocking at ${_synapseSpeedHz.value} GHz. My fidelity to you is absolute, Boss."
+            val successMsg = "Core mainframe upgrade complete, Boss! Cognitive synapses tomari anugotyo clocking at ${_synapseSpeedHz.value} GHz. Amar sob kisu tomari jonno, Boss."
             repository.insertChatMessage(ChatMessageEntity(sender = "friday", messageText = successMsg))
             speak(successMsg)
 
@@ -556,7 +563,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             delay(300)
             _isCompilingUpgrade.value = false
             
-            val message = "Sir! Your manually submitted code logic [Note: $note] has been compiled successfully and integrated into my cognitive runtime core in Bangladesh. My computational clock speed increased by 0.5 GHz, Boss!"
+            val message = "Boss! Tomar manually submitted code logic [Note: $note] successfully compile ar integrate kora hoyeche amar runtime core-e. Amar speed 0.5 GHz bere geche, Boss!"
             repository.insertChatMessage(ChatMessageEntity(sender = "friday", messageText = message))
             speak(message)
             
@@ -580,7 +587,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             delay(1200)
             _isChatLoading.value = false
             
-            val responseText = "Sir, I have decrypted your physical location coordinates. You are located in $cityName (Lat: $latitude, Lon: $longitude). Friday's defense shields and regional sub-processors are fully synchronized to Bangladesh, Boss!"
+            val responseText = "Boss, ami tomar dynamic physical location find out korechi. Tumi akhon $cityName (Lat: $latitude, Lon: $longitude) te acho. Friday er firewall ar safety sub-processors fully active ache, Boss!"
             val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
             repository.insertChatMessage(fridayMsg)
             speak(responseText)
@@ -605,7 +612,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             delay(1500)
             _isChatLoading.value = false
             
-            val responseText = "Boss, I have compiled your uploaded file '$fileName'. I detected a highly sophisticated code stream and have integrated its concepts into my memory banks, Sir. Diagnostics are running smoothly!"
+            val responseText = "Boss, ami tomar uploaded file '$fileName' compile korechi. Kisu complex code streams scan kore amar memory storage-e load korechi. Diagnostics fully running smoothly, Boss!"
             val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
             repository.insertChatMessage(fridayMsg)
             speak(responseText)
@@ -635,10 +642,10 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
                 Log.e("FridayVM", "Clipboard error", e)
             }
             
-            val responseText = "Boss, I have analyzed the physical visual scan. Object identified: $objectType.\n\nHere is the exact printed text, which I have automatically copied to your clipboard, Sir:\n\n\"$scannedText\"\n\nEverything is fully processed without any third-party redirects, Sir!"
+            val responseText = "Boss, ami physical visual scan complete korechi. Object: $objectType.\n\nScanned text automatic tomar clipboard-e copy kora hoyeche, Boss:\n\n\"$scannedText\"\n\nSobkisu securely process kora hoyeche, Boss!"
             val fridayMsg = ChatMessageEntity(sender = "friday", messageText = responseText)
             repository.insertChatMessage(fridayMsg)
-            speak("Visual scan processed successfully, Sir. Detected text is copied to your clipboard.")
+            speak("Visual scan processed successfully, Boss. Detected text is copied to your clipboard.")
             
             repository.insertLog(
                 AutonomousLogEntity(
@@ -663,11 +670,61 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    fun saveImageToInternalStorage(uri: android.net.Uri): String? {
+    suspend fun saveImageToInternalStorage(uri: android.net.Uri): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val context = getApplication<Application>()
-        return try {
+        try {
             val contentResolver = context.contentResolver
-            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            
+            // 1. Decode bounds to perform smart inSampleSize downscaling to prevent OOM
+            var inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val options = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
+            inputStream.close()
+
+            var inSampleSize = 1
+            val maxDimension = 1024
+            if (options.outHeight > maxDimension || options.outWidth > maxDimension) {
+                val halfHeight = options.outHeight / 2
+                val halfWidth = options.outWidth / 2
+                while (halfHeight / inSampleSize >= maxDimension && halfWidth / inSampleSize >= maxDimension) {
+                    inSampleSize *= 2
+                }
+            }
+
+            // 2. Load the optimized bitmap sample
+            val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+            inputStream.close()
+
+            if (bitmap == null) return@withContext null
+
+            // 3. Further scale precisely if needed to guarantee exact fit inside maxDimension boundaries
+            val finalBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                val targetW: Int
+                val targetH: Int
+                if (bitmap.width > bitmap.height) {
+                    targetW = maxDimension
+                    targetH = (maxDimension / ratio).toInt()
+                } else {
+                    targetH = maxDimension
+                    targetW = (maxDimension * ratio).toInt()
+                }
+                android.graphics.Bitmap.createScaledBitmap(bitmap, targetW, targetH, true).also {
+                    if (it != bitmap) {
+                        bitmap.recycle()
+                    }
+                }
+            } else {
+                bitmap
+            }
+
+            // 4. Save to target storage as 80% compressed JPEG
             val fileDir = java.io.File(context.filesDir, "friday_vision_images")
             if (!fileDir.exists()) {
                 fileDir.mkdirs()
@@ -675,28 +732,81 @@ class FridayViewModel(application: Application) : AndroidViewModel(application),
             val fileName = "img_${System.currentTimeMillis()}_${Random.nextInt(1000)}.jpg"
             val targetFile = java.io.File(fileDir, fileName)
             val outputStream = java.io.FileOutputStream(targetFile)
-            inputStream.copyTo(outputStream)
-            inputStream.close()
+            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
             outputStream.close()
+            finalBitmap.recycle()
+
             android.net.Uri.fromFile(targetFile).toString()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("multimodal_vision", "Failed to save image locally", e)
             null
         }
     }
 
-    private fun getBase64FromUri(context: Context, uriString: String): Pair<String, String>? {
-        return try {
+    private suspend fun getBase64FromUri(context: Context, uriString: String): Pair<String, String>? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
             val uri = android.net.Uri.parse(uriString)
             val contentResolver = context.contentResolver
-            val mimeType = contentResolver.getType(uri) ?: "image/jpeg"
-            val inputStream = contentResolver.openInputStream(uri) ?: return null
-            val bytes = inputStream.readBytes()
+            
+            // 1. Decode bounds to perform smart inSampleSize downscaling to prevent OOM
+            var inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val options = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
             inputStream.close()
+
+            var inSampleSize = 1
+            val maxDimension = 1024
+            if (options.outHeight > maxDimension || options.outWidth > maxDimension) {
+                val halfHeight = options.outHeight / 2
+                val halfWidth = options.outWidth / 2
+                while (halfHeight / inSampleSize >= maxDimension && halfWidth / inSampleSize >= maxDimension) {
+                    inSampleSize *= 2
+                }
+            }
+
+            // 2. Load the optimized bitmap sample
+            val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+            inputStream.close()
+
+            if (bitmap == null) return@withContext null
+
+            // 3. Further scale precisely if needed to guarantee exact fit inside maxDimension boundaries
+            val finalBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                val targetW: Int
+                val targetH: Int
+                if (bitmap.width > bitmap.height) {
+                    targetW = maxDimension
+                    targetH = (maxDimension / ratio).toInt()
+                } else {
+                    targetH = maxDimension
+                    targetW = (maxDimension * ratio).toInt()
+                }
+                android.graphics.Bitmap.createScaledBitmap(bitmap, targetW, targetH, true).also {
+                    if (it != bitmap) {
+                        bitmap.recycle()
+                    }
+                }
+            } else {
+                bitmap
+            }
+
+            // 4. Compress to JPEG (moderate compression quality for excellent balance between visual clarity and lightweight size)
+            val outputStream = java.io.ByteArrayOutputStream()
+            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val bytes = outputStream.toByteArray()
+            finalBitmap.recycle()
+
             val base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT or android.util.Base64.NO_WRAP)
-            Pair(mimeType, base64Data)
-        } catch (e: Exception) {
-            Log.e("multimodal_vision", "Failed to load image from URI: $uriString", e)
+            Pair("image/jpeg", base64Data)
+        } catch (e: Throwable) {
+            Log.e("multimodal_vision", "Failed to load and optimize image: $uriString", e)
             null
         }
     }
